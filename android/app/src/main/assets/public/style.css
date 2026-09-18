@@ -1,0 +1,304 @@
+* {
+    box-sizing: border-box;
+}
+
+body {
+    margin: 0;
+    font-family: Arial, sans-serif;
+    background: #f2f5f9;
+    color: #18202a;
+}
+
+.app {
+    width: 100%;
+    max-width: 520px;
+    margin: auto;
+    padding: 20px;
+    padding-bottom: 100px;
+}
+
+header {
+    text-align: center;
+    margin-bottom: 20px;
+}
+
+header h1 {
+    margin: 0;
+    font-size: 26px;
+}
+
+header p {
+    margin: 8px 0 0;
+    color: #687384;
+}
+
+.current-card,
+.next-card,
+.tasks {
+    background: white;
+    border-radius: 18px;
+    padding: 20px;
+    margin-bottom: 16px;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.08);
+}
+
+.current-card {
+    border-left: 6px solid #22a06b;
+}
+
+.next-card {
+    border-left: 6px solid #4b7bec;
+}
+
+.label {
+    font-size: 12px;
+    font-weight: bold;
+    letter-spacing: 1px;
+    color: #687384;
+}
+
+.current-card h2,
+.next-card h2 {
+    margin: 8px 0;
+    font-size: 24px;
+}
+
+.current-card p,
+.next-card p {
+    color: #687384;
+    margin: 0;
+}
+
+.countdown {
+    font-size: 40px;
+    font-weight: bold;
+    text-align: center;
+    margin-top: 18px;
+}
+
+.remaining-text {
+    text-align: center;
+    color: #687384;
+    font-size: 13px;
+}
+
+.next-countdown {
+    margin-top: 16px;
+    color: #687384;
+}
+
+.next-countdown strong {
+    color: #18202a;
+    font-size: 20px;
+}
+
+.tasks h2 {
+    margin-top: 0;
+}
+
+.task {
+    display: grid;
+    grid-template-columns: 12px 72px minmax(0, 1fr);
+    gap: 10px;
+    align-items: center;
+    padding: 13px 0;
+    border-bottom: 1px solid #e5e8ed;
+}
+
+.task:last-child {
+    border-bottom: none;
+}
+
+.task-dot {
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    background: #cbd1d9;
+}
+
+.task.done .task-dot {
+    background: #22a06b;
+}
+
+.task.current .task-dot {
+    background: #f5a623;
+}
+
+.task-time {
+    font-size: 13px;
+    color: #687384;
+}
+
+.task-name {
+    font-weight: bold;
+    min-width: 0;
+    white-space: pre-wrap;
+}
+
+.daybar {
+    display: flex;
+    gap: 8px;
+    overflow-x: auto;
+    padding-bottom: 12px;
+}
+
+.day-button {
+    border: 1px solid #dce1e7;
+    background: white;
+    border-radius: 12px;
+    padding: 11px 14px;
+    min-width: 85px;
+    font-weight: bold;
+    cursor: pointer;
+}
+
+.day-button.active {
+    background: #e9efff;
+    border-color: #315efb;
+}
+
+.section-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.section-header h2 {
+    margin: 0;
+}
+
+.section-header p {
+    margin: 5px 0 0;
+    color: #687384;
+    font-size: 13px;
+}
+
+.edit-button {
+    border: 1px solid #dce1e7;
+    background: #f7f8fa;
+    border-radius: 9px;
+    padding: 8px 12px;
+    cursor: pointer;
+}
+
+.delete-button {
+    background-color: #d48181;
+    padding: 6px 10px;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+}
+
+.add-button {
+    width: 100%;
+    border: none;
+    background: #e9efff;
+    border-radius: 12px;
+    padding: 14px;
+    font-weight: bold;
+    font-size: 15px;
+    cursor: pointer;
+    margin-top: 12px;
+}
+
+nav {
+    position: fixed;
+    bottom: 0;
+    left: 50%;
+    transform: translateX(-50%);
+    width: min(520px, 100%);
+    display: flex;
+    background: white;
+    border-top: 1px solid #dce1e7;
+}
+
+.nav-button {
+    flex: 1;
+    min-height: 64px;
+    border: none;
+    background: white;
+    cursor: pointer;
+    font-size: 20px;
+}
+
+.nav-button span {
+    display: block;
+    font-size: 12px;
+    margin-top: 3px;
+}
+
+.nav-button.active {
+    background: #e9efff;
+}
+
+.hidden {
+    display: none;
+}
+
+dialog {
+    border: none;
+    border-radius: 18px;
+    padding: 22px;
+    width: min(420px, calc(100% - 32px));
+}
+
+dialog::backdrop {
+    background: rgba(0, 0, 0, 0.35);
+}
+
+dialog h2 {
+    margin-top: 0;
+}
+
+label {
+    display: block;
+    font-weight: bold;
+    font-size: 14px;
+    margin-top: 14px;
+}
+
+input {
+    display: block;
+    width: 100%;
+    margin-top: 6px;
+    padding: 12px;
+    border: 1px solid #dce1e7;
+    border-radius: 10px;
+    font-size: 16px;
+}
+
+.dialog-buttons {
+    display: flex;
+    gap: 10px;
+    justify-content: flex-end;
+    margin-top: 20px;
+}
+
+.dialog-buttons button {
+    min-height: 44px;
+    padding: 10px 16px;
+    border: 1px solid #dce1e7;
+    border-radius: 10px;
+    background: white;
+    cursor: pointer;
+}
+
+.save-button {
+    background: #e9efff !important;
+    font-weight: bold;
+}
+
+@media (max-width: 380px) {
+
+    .app {
+        padding: 14px;
+    }
+
+    .countdown {
+        font-size: 32px;
+    }
+
+    .task {
+        grid-template-columns: 12px 62px minmax(0, 1fr);
+    }
+}

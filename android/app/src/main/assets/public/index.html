@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Study Timetable</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+
+<main class="app">
+
+    <header>
+        <h1>📚 Study Timetable</h1>
+        <p id="date"></p>
+    </header>
+
+    <!-- HOME -->
+    <section id="homePage">
+
+        <div class="current-card">
+            <div class="label">CURRENT TASK</div>
+
+            <h2 id="currentTask">No task</h2>
+
+            <p id="currentTime"></p>
+
+            <div class="countdown" id="currentCountdown">
+                --:--:--
+            </div>
+
+            <div class="remaining-text">
+                remaining
+            </div>
+        </div>
+
+        <div class="next-card">
+            <div class="label">NEXT TASK</div>
+
+            <h2 id="nextTask">No task</h2>
+
+            <p id="nextTime"></p>
+
+            <div class="next-countdown">
+                Starts in
+                <strong id="nextCountdown">--:--:--</strong>
+            </div>
+        </div>
+
+        <div class="tasks">
+            <h2>Today's Tasks</h2>
+            <div id="homeTaskList"></div>
+        </div>
+
+    </section>
+
+
+    <!-- TIMETABLE -->
+    <section id="timetablePage" class="hidden">
+
+        <div class="daybar" id="days"></div>
+
+        <div class="tasks">
+            <div class="section-header">
+                <div>
+                    <h2 id="dayTitle"></h2>
+                    <p id="taskCount"></p>
+                </div>
+            </div>
+
+            <div id="taskList"></div>
+
+            <button id="addTask" class="add-button">
+                ＋ Add task
+            </button>
+        </div>
+
+    </section>
+
+
+    <!-- NAVIGATION -->
+    <nav>
+        <button id="homeButton" class="nav-button active">
+            🏠
+            <span>Home</span>
+        </button>
+
+        <button id="timetableButton" class="nav-button">
+            📅
+            <span>Timetable</span>
+        </button>
+    </nav>
+
+
+    <!-- EDIT DIALOG -->
+    <dialog id="editor">
+
+        <form id="taskForm">
+
+            <h2 id="editorTitle">Add task</h2>
+
+            <label>
+                Task name
+                <input
+                    id="taskName"
+                    type="text"
+                    maxlength="80"
+                    required
+                    placeholder="Math / الرياضيات"
+                >
+            </label>
+
+            <label>
+                Start
+                <input
+                    id="taskStart"
+                    type="time"
+                    required
+                >
+            </label>
+
+            <label>
+                End
+                <input
+                    id="taskEnd"
+                    type="time"
+                    required
+                >
+            </label>
+
+            <div class="dialog-buttons">
+
+                <button
+                    type="button"
+                    id="cancelButton"
+                >
+                    Cancel
+                </button>
+
+                <button
+                    type="submit"
+                    class="save-button"
+                >
+                    Save
+                </button>
+
+            </div>
+
+        </form>
+
+    </dialog>
+
+</main>
+
+<script src="app.js"></script>
+
+</body>
+</html>
+
