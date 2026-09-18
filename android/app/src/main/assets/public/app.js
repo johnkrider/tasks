@@ -94,6 +94,67 @@ function saveTimetable() {
         "studyTimetable",
         JSON.stringify(timetable)
     );
+
+    syncNativeAlarms();
+}
+
+
+// =====================
+// ANDROID ALARMS
+// =====================
+
+const StudyAlarm =
+    window.Capacitor && window.Capacitor.registerPlugin
+        ? window.Capacitor.registerPlugin("StudyAlarm")
+        : null;
+
+
+function syncNativeAlarms() {
+
+    if (!StudyAlarm) return;
+
+    const now = new Date();
+    const dayNumbers = {
+        Sunday: 0,
+        Monday: 1,
+        Tuesday: 2,
+        Wednesday: 3,
+        Thursday: 4,
+        Friday: 5,
+        Saturday: 6
+    };
+
+    const alarms = [];
+    let id = 1000;
+
+    for (const day of dayOrder) {
+
+        for (const task of timetable[day]) {
+
+            if (!task.start) continue;
+
+            const [hour, minute] = task.start.split(":").map(Number);
+            const trigger = new Date(now);
+            const currentDay = trigger.getDay();
+            let daysAhead = (dayNumbers[day] - currentDay + 7) % 7;
+
+            trigger.setDate(trigger.getDate() + daysAhead);
+            trigger.setHours(hour, minute - 10, 0, 0);
+
+            if (trigger.getTime() <= now.getTime()) {
+                trigger.setDate(trigger.getDate() + 7);
+            }
+
+            alarms.push({
+                id: id++,
+                task: task.name,
+                triggerAt: trigger.getTime()
+            });
+        }
+    }
+
+    StudyAlarm.schedule({ alarms })
+        .catch(error => console.error("Could not schedule alarms:", error));
 }
 
 
@@ -131,6 +192,7 @@ function loadTimetable() {
 
 
 loadTimetable();
+syncNativeAlarms();
 
 
 // =====================
