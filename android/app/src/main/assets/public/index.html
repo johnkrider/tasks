@@ -79,6 +79,64 @@
     </section>
 
 
+    <!-- SETTINGS -->
+    <section id="settingsPage" class="hidden">
+
+        <div class="tasks">
+            <h2>⏰ Alarm</h2>
+            <p class="hint" id="alarmInfo"></p>
+
+            <label class="switch-row">
+                <span>Alarm before every task</span>
+                <input id="setEnabled" type="checkbox">
+            </label>
+
+            <label>
+                Minutes before the task
+                <input id="setLead" type="number" inputmode="numeric" min="0" max="240">
+            </label>
+
+            <label>
+                Seconds to hold the button to stop
+                <input id="setHold" type="number" inputmode="numeric" min="1" max="60">
+            </label>
+
+            <label>
+                Maths problems before you can stop
+                <input id="setMath" type="number" inputmode="numeric" min="0" max="10">
+            </label>
+            <p class="hint">0 turns the maths challenge off.</p>
+
+            <label class="switch-row">
+                <span>Force maximum volume (gets louder over 20 s)</span>
+                <input id="setVolume" type="checkbox">
+            </label>
+
+            <label class="switch-row">
+                <span>Vibrate</span>
+                <input id="setVibrate" type="checkbox">
+            </label>
+
+            <button id="testAlarm" class="add-button">
+                Test alarm in 10 seconds
+            </button>
+            <p class="hint">
+                After tapping, lock the phone or close the app to check it still rings.
+                Turn an alarm off for a single task with the checkbox in its editor.
+            </p>
+        </div>
+
+        <div class="tasks">
+            <h2>Alarm permissions</h2>
+            <div id="permissionList"></div>
+            <p class="hint">
+                Add the widget from your home screen: long-press an empty spot, tap Widgets, pick Study timetable.
+            </p>
+        </div>
+
+    </section>
+
+
     <!-- NAVIGATION -->
     <nav>
         <button id="homeButton" class="nav-button active">
@@ -89,6 +147,11 @@
         <button id="timetableButton" class="nav-button">
             📅
             <span>Timetable</span>
+        </button>
+
+        <button id="settingsButton" class="nav-button">
+            ⚙️
+            <span>Settings</span>
         </button>
     </nav>
 
@@ -129,6 +192,15 @@
                 >
             </label>
 
+            <label class="switch-row">
+                <span>Alarm before this task</span>
+                <input
+                    id="taskAlarm"
+                    type="checkbox"
+                    checked
+                >
+            </label>
+
             <div class="dialog-buttons">
 
                 <button
@@ -157,4 +229,3 @@
 
 </body>
 </html>
-
