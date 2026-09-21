@@ -8,6 +8,7 @@ import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
 import android.os.SystemClock;
+import android.util.Log;
 import android.view.View;
 import android.widget.RemoteViews;
 
@@ -30,6 +31,8 @@ import java.util.Locale;
  * or ends (and after boot, clock changes, and whenever the app saves the timetable).
  */
 public class TimetableWidgetProvider extends AppWidgetProvider {
+
+    private static final String TAG = "StudyWidget";
 
     static final String ACTION_REFRESH = "io.johnkrider12.tasks.WIDGET_REFRESH";
 
@@ -90,36 +93,42 @@ public class TimetableWidgetProvider extends AppWidgetProvider {
 
     static void refreshAll(Context context) {
         Context app = context.getApplicationContext();
-        AppWidgetManager manager = AppWidgetManager.getInstance(app);
-        int[] ids = manager.getAppWidgetIds(new ComponentName(app, TimetableWidgetProvider.class));
 
-        if (ids == null || ids.length == 0) {
-            cancelRefresh(app);
-            return;
-        }
+        try {
+            AppWidgetManager manager = AppWidgetManager.getInstance(app);
+            int[] ids = manager.getAppWidgetIds(new ComponentName(app, TimetableWidgetProvider.class));
 
-        long now = System.currentTimeMillis();
-        List<Task> all = loadTasks(app, now);
-
-        Task current = null;
-        List<Task> next = new ArrayList<>();
-
-        for (Task t : all) {
-            if (t.start <= now && now < t.end) {
-                if (current == null) current = t;
-            } else if (t.start > now && next.size() < 3) {
-                next.add(t);
+            if (ids == null || ids.length == 0) {
+                cancelRefresh(app);
+                return;
             }
-        }
 
-        manager.updateAppWidget(ids, render(app, all.isEmpty(), current, next, now));
+            long now = System.currentTimeMillis();
+            List<Task> all = loadTasks(app, now);
 
-        long boundary = -1;
-        if (current != null) boundary = current.end;
-        if (!next.isEmpty() && (boundary < 0 || next.get(0).start < boundary)) {
-            boundary = next.get(0).start;
+            Task current = null;
+            List<Task> next = new ArrayList<>();
+
+            for (Task t : all) {
+                if (t.start <= now && now < t.end) {
+                    if (current == null) current = t;
+                } else if (t.start > now && next.size() < 3) {
+                    next.add(t);
+                }
+            }
+
+            manager.updateAppWidget(ids, render(app, all.isEmpty(), current, next, now));
+
+            long boundary = -1;
+            if (current != null) boundary = current.end;
+            if (!next.isEmpty() && (boundary < 0 || next.get(0).start < boundary)) {
+                boundary = next.get(0).start;
+            }
+            scheduleRefresh(app, boundary);
+        } catch (Throwable e) {
+            // A widget bug must never crash the app or block adding the widget.
+            Log.e(TAG, "Widget refresh failed", e);
         }
-        scheduleRefresh(app, boundary);
     }
 
     private static RemoteViews render(Context c, boolean noData, Task current, List<Task> next, long now) {

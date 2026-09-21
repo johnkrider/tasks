@@ -194,16 +194,60 @@ function loadTimetable() {
 // ANDROID (alarms + widget)
 // =====================
 
+const capacitor = window.Capacitor;
+
+// Capacitor's native bridge builds a ready-made object for every plugin
+// that MainActivity registered. Prefer that; fall back to registerPlugin.
+const pluginFromBridge =
+    capacitor && capacitor.Plugins && capacitor.Plugins.StudyAlarm;
+
+
+// "Am I inside the Android app?" - checked in several ways because
+// not every Capacitor build exposes every helper.
 const isNative = !!(
-    window.Capacitor &&
-    typeof window.Capacitor.isNativePlatform === "function" &&
-    window.Capacitor.isNativePlatform()
+    window.androidBridge ||
+    pluginFromBridge ||
+    (
+        capacitor &&
+        (
+            (
+                typeof capacitor.isNativePlatform === "function" &&
+                capacitor.isNativePlatform()
+            ) ||
+            (
+                typeof capacitor.getPlatform === "function" &&
+                capacitor.getPlatform() !== "web"
+            )
+        )
+    )
 );
 
-const StudyAlarm =
-    isNative && window.Capacitor.registerPlugin
-        ? window.Capacitor.registerPlugin("StudyAlarm")
-        : null;
+
+let StudyAlarm = null;
+
+if (isNative) {
+
+    if (pluginFromBridge) {
+
+        StudyAlarm = pluginFromBridge;
+
+    } else if (
+        capacitor &&
+        typeof capacitor.registerPlugin === "function"
+    ) {
+
+        StudyAlarm = capacitor.registerPlugin("StudyAlarm");
+
+    }
+}
+
+
+function noPluginMessage() {
+
+    return isNative
+        ? "The Android app started, but the alarm plugin did not load."
+        : "Alarms only work in the Android app.";
+}
 
 
 let lastSync = null;
@@ -1056,8 +1100,7 @@ function renderAlarmInfo() {
 
     if (!StudyAlarm) {
 
-        alarmInfo.textContent =
-            "Alarms only work in the Android app.";
+        alarmInfo.textContent = noPluginMessage();
 
         return;
 
@@ -1276,20 +1319,28 @@ function bindSettings() {
 
             if (!StudyAlarm) {
 
-                alert("Alarms only work in the Android app.");
+                alert(noPluginMessage());
 
                 return;
 
             }
 
 
-            // make sure the newest settings are on the native side first
-            await syncNative();
+            try {
 
-            await StudyAlarm.testAlarm({ seconds: 10 });
+                // make sure the newest settings are on the native side first
+                await syncNative();
 
-            alarmInfo.textContent =
-                "Test alarm in 10 seconds. Lock the phone or close the app now.";
+                await StudyAlarm.testAlarm({ seconds: 10 });
+
+                alarmInfo.textContent =
+                    "Test alarm in 10 seconds. Lock the phone or close the app now.";
+
+            } catch (error) {
+
+                alert("Could not start the test alarm: " + (error && error.message ? error.message : error));
+
+            }
 
         }
     );
