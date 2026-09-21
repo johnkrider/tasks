@@ -1,31 +1,29 @@
 package io.johnkrider12.tasks;
 
-import android.app.AlarmManager;
-import android.app.PendingIntent;
+import android.app.NotificationManager;
 import android.content.Context;
 import android.content.Intent;
+import android.net.Uri;
 import android.os.Build;
+import android.os.PowerManager;
+import android.provider.Settings;
 
-import androidx.annotation.NonNull;
+import androidx.core.app.NotificationManagerCompat;
 
 import com.getcapacitor.JSArray;
+import com.getcapacitor.JSObject;
 import com.getcapacitor.Plugin;
 import com.getcapacitor.PluginCall;
-import com.getcapacitor.annotation.CapacitorPlugin;
 import com.getcapacitor.PluginMethod;
-
-import org.json.JSONException;
-import org.json.JSONObject;
-
-import java.util.HashSet;
-import java.util.Set;
+import com.getcapacitor.annotation.CapacitorPlugin;
 
 @CapacitorPlugin(name = "StudyAlarm")
 public class StudyAlarmPlugin extends Plugin {
 
-    private static final String PREFS = "study_alarm_prefs";
-    private static final String IDS = "scheduled_ids";
-
+    /**
+     * schedule({ alarms: [{id, task, day, start}], config: {...}, timetable: {...} })
+     * Stores everything natively, (re)creates the alarms and refreshes the widget.
+     */
     @PluginMethod
     public void schedule(PluginCall call) {
         JSArray alarms = call.getArray("alarms");
@@ -34,97 +32,84 @@ public class StudyAlarmPlugin extends Plugin {
             return;
         }
 
-        AlarmManager alarmManager = (AlarmManager) getContext().getSystemService(Context.ALARM_SERVICE);
-        cancelStoredAlarms(alarmManager);
+        Context context = getContext();
 
-        Set<String> ids = new HashSet<>();
+        AlarmScheduler.save(context, call.getObject("config"), alarms, call.getObject("timetable"));
+        long next = AlarmScheduler.rescheduleAll(context);
+        TimetableWidgetProvider.refreshAll(context);
 
-        try {
-            for (int i = 0; i < alarms.length(); i++) {
-                JSONObject alarm = alarms.getJSONObject(i);
-                int id = alarm.getInt("id");
-                long triggerAt = alarm.getLong("triggerAt");
-                String taskName = alarm.optString("task", "Study task");
-
-                Intent intent = new Intent(getContext(), AlarmReceiver.class);
-                intent.putExtra("alarm_id", id);
-                intent.putExtra("task_name", taskName);
-                intent.putExtra("trigger_at", triggerAt);
-
-                PendingIntent pendingIntent = PendingIntent.getBroadcast(
-                        getContext(),
-                        id,
-                        intent,
-                        PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE
-                );
-
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && !alarmManager.canScheduleExactAlarms()) {
-                    call.reject("Exact alarms are not allowed for this app. Enable Alarms & reminders in Android settings.");
-                    return;
-                }
-
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-                    alarmManager.setExactAndAllowWhileIdle(
-                            AlarmManager.RTC_WAKEUP,
-                            triggerAt,
-                            pendingIntent
-                    );
-                } else {
-                    alarmManager.setExact(
-                            AlarmManager.RTC_WAKEUP,
-                            triggerAt,
-                            pendingIntent
-                    );
-                }
-
-                ids.add(String.valueOf(id));
-            }
-        } catch (JSONException e) {
-            call.reject("Invalid alarm data", e);
-            return;
-        }
-
-        getContext().getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-                .edit()
-                .putStringSet(IDS, ids)
-                .apply();
-
-        call.resolve();
+        JSObject result = new JSObject();
+        result.put("scheduled", alarms.length());
+        result.put("nextAlarmAt", next);
+        call.resolve(result);
     }
 
     @PluginMethod
     public void cancel(PluginCall call) {
-        AlarmManager alarmManager = (AlarmManager) getContext().getSystemService(Context.ALARM_SERVICE);
-        cancelStoredAlarms(alarmManager);
+        AlarmScheduler.cancelAll(getContext());
         call.resolve();
     }
 
-    private void cancelStoredAlarms(AlarmManager alarmManager) {
-        Set<String> ids = getContext()
-                .getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-                .getStringSet(IDS, new HashSet<>());
+    /** Rings once in a few seconds so the whole chain can be tested with the app closed. */
+    @PluginMethod
+    public void testAlarm(PluginCall call) {
+        Integer seconds = call.getInt("seconds", 10);
+        AlarmScheduler.scheduleTest(getContext(), seconds == null ? 10 : seconds);
+        call.resolve();
+    }
 
-        for (String value : ids) {
-            try {
-                int id = Integer.parseInt(value);
-                Intent intent = new Intent(getContext(), AlarmReceiver.class);
-                PendingIntent pendingIntent = PendingIntent.getBroadcast(
-                        getContext(),
-                        id,
-                        intent,
-                        PendingIntent.FLAG_NO_CREATE | PendingIntent.FLAG_IMMUTABLE
-                );
-                if (pendingIntent != null) {
-                    alarmManager.cancel(pendingIntent);
-                    pendingIntent.cancel();
-                }
-            } catch (NumberFormatException ignored) {
-            }
+    @PluginMethod
+    public void getStatus(PluginCall call) {
+        Context context = getContext();
+
+        boolean notifications = NotificationManagerCompat.from(context).areNotificationsEnabled();
+
+        boolean fullScreen = true;
+        if (Build.VERSION.SDK_INT >= 34) {
+            NotificationManager nm = context.getSystemService(NotificationManager.class);
+            fullScreen = nm != null && nm.canUseFullScreenIntent();
         }
 
-        getContext().getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-                .edit()
-                .remove(IDS)
-                .apply();
+        PowerManager pm = (PowerManager) context.getSystemService(Context.POWER_SERVICE);
+        boolean battery = pm != null && pm.isIgnoringBatteryOptimizations(context.getPackageName());
+
+        JSObject result = new JSObject();
+        result.put("notifications", notifications);
+        result.put("fullScreen", fullScreen);
+        result.put("batteryUnrestricted", battery);
+        call.resolve(result);
+    }
+
+    /** openSettings({ type: "notifications" | "fullScreen" | "battery" }) */
+    @PluginMethod
+    public void openSettings(PluginCall call) {
+        Context context = getContext();
+        String type = call.getString("type", "notifications");
+        String pkg = context.getPackageName();
+
+        Intent intent;
+        if ("fullScreen".equals(type) && Build.VERSION.SDK_INT >= 34) {
+            intent = new Intent(Settings.ACTION_MANAGE_APP_USE_FULL_SCREEN_INTENT,
+                    Uri.parse("package:" + pkg));
+        } else if ("battery".equals(type)) {
+            intent = new Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS);
+        } else if ("notifications".equals(type)) {
+            intent = new Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS)
+                    .putExtra(Settings.EXTRA_APP_PACKAGE, pkg);
+        } else {
+            intent = new Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:" + pkg));
+        }
+        intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+
+        try {
+            context.startActivity(intent);
+        } catch (RuntimeException e) {
+            Intent fallback = new Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
+                    Uri.parse("package:" + pkg));
+            fallback.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+            context.startActivity(fallback);
+        }
+
+        call.resolve();
     }
 }

@@ -288,6 +288,44 @@ input {
     font-weight: bold;
 }
 
+/* ---------- Settings + alarm checkbox ---------- */
+
+.switch-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 16px;
+}
+
+.switch-row input[type="checkbox"] {
+    flex: none;
+    width: 24px;
+    height: 24px;
+    margin: 0;
+    padding: 0;
+}
+
+.hint {
+    margin: 6px 0 0;
+    color: #687384;
+    font-size: 13px;
+    line-height: 1.4;
+}
+
+.perm {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 0;
+    border-bottom: 1px solid #e5e8ed;
+    font-size: 14px;
+}
+
+.perm:last-child {
+    border-bottom: none;
+}
+
 @media (max-width: 380px) {
 
     .app {

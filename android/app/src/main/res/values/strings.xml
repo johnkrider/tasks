@@ -4,4 +4,6 @@
     <string name="title_activity_main">tasks</string>
     <string name="package_name">io.johnkrider12.tasks</string>
     <string name="custom_url_scheme">io.johnkrider12.tasks</string>
+    <string name="widget_name">Study timetable</string>
+    <string name="widget_description">Your current task and the next three, with a live countdown.</string>
 </resources>

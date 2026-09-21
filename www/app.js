@@ -1,10 +1,9 @@
 /*
     STUDY TIMETABLE APP
 
-    All timetable information is stored here for now.
-
-    Later we will move this into persistent storage so
-    changes made by the user remain after closing the app.
+    The timetable (and the alarm settings) are saved in localStorage.
+    Every time either one changes, the whole thing is pushed to the native
+    Android side, which owns the alarms and the home-screen widget.
 */
 
 
@@ -86,75 +85,75 @@ const dayOrder = [
 
 
 // =====================
+// Alarm settings
+// =====================
+
+const defaultSettings = {
+    alarmsEnabled: true,
+    leadMinutes: 10,
+    holdSeconds: 5,
+    mathCount: 0,
+    maxVolume: true,
+    vibrate: true
+};
+
+let settings = { ...defaultSettings };
+
+
+function clampInt(value, min, max, fallback) {
+
+    const number = parseInt(value, 10);
+
+    if (Number.isNaN(number)) return fallback;
+
+    return Math.max(min, Math.min(max, number));
+}
+
+
+function loadSettings() {
+
+    try {
+
+        const saved =
+            JSON.parse(localStorage.getItem("studySettings"));
+
+        if (saved && typeof saved === "object") {
+
+            settings = { ...defaultSettings, ...saved };
+
+        }
+
+    } catch (error) {
+
+        console.error("Could not load settings:", error);
+
+    }
+}
+
+
+function saveSettings() {
+
+    localStorage.setItem(
+        "studySettings",
+        JSON.stringify(settings)
+    );
+
+    syncNative();
+}
+
+
+// =====================
 // Edits
 // =====================
 
 function saveTimetable() {
+
     localStorage.setItem(
         "studyTimetable",
         JSON.stringify(timetable)
     );
 
-    syncNativeAlarms();
-}
-
-
-// =====================
-// ANDROID ALARMS
-// =====================
-
-const StudyAlarm =
-    window.Capacitor && window.Capacitor.registerPlugin
-        ? window.Capacitor.registerPlugin("StudyAlarm")
-        : null;
-
-
-function syncNativeAlarms() {
-
-    if (!StudyAlarm) return;
-
-    const now = new Date();
-    const dayNumbers = {
-        Sunday: 0,
-        Monday: 1,
-        Tuesday: 2,
-        Wednesday: 3,
-        Thursday: 4,
-        Friday: 5,
-        Saturday: 6
-    };
-
-    const alarms = [];
-    let id = 1000;
-
-    for (const day of dayOrder) {
-
-        for (const task of timetable[day]) {
-
-            if (!task.start) continue;
-
-            const [hour, minute] = task.start.split(":").map(Number);
-            const trigger = new Date(now);
-            const currentDay = trigger.getDay();
-            let daysAhead = (dayNumbers[day] - currentDay + 7) % 7;
-
-            trigger.setDate(trigger.getDate() + daysAhead);
-            trigger.setHours(hour, minute - 10, 0, 0);
-
-            if (trigger.getTime() <= now.getTime()) {
-                trigger.setDate(trigger.getDate() + 7);
-            }
-
-            alarms.push({
-                id: id++,
-                task: task.name,
-                triggerAt: trigger.getTime()
-            });
-        }
-    }
-
-    StudyAlarm.schedule({ alarms })
-        .catch(error => console.error("Could not schedule alarms:", error));
+    syncNative();
 }
 
 
@@ -191,8 +190,87 @@ function loadTimetable() {
 }
 
 
-loadTimetable();
-syncNativeAlarms();
+// =====================
+// ANDROID (alarms + widget)
+// =====================
+
+const isNative = !!(
+    window.Capacitor &&
+    typeof window.Capacitor.isNativePlatform === "function" &&
+    window.Capacitor.isNativePlatform()
+);
+
+const StudyAlarm =
+    isNative && window.Capacitor.registerPlugin
+        ? window.Capacitor.registerPlugin("StudyAlarm")
+        : null;
+
+
+let lastSync = null;
+
+
+// One alarm per task. Android works out the exact time itself
+// (weekday + start time - lead minutes), so it keeps working
+// every week, across daylight-saving changes, and after a reboot.
+function buildAlarmList() {
+
+    const alarms = [];
+    let id = 1000;
+
+    for (const day of dayOrder) {
+
+        for (const task of timetable[day]) {
+
+            if (!task.start) continue;
+
+            const thisId = id++;
+
+            if (task.alarm === false) continue;
+
+            alarms.push({
+                id: thisId,
+                task: task.name,
+                day: day,
+                start: task.start
+            });
+        }
+    }
+
+    return alarms;
+}
+
+
+function syncNative() {
+
+    if (!StudyAlarm) return Promise.resolve(null);
+
+    return StudyAlarm.schedule({
+        alarms: buildAlarmList(),
+        config: {
+            enabled: settings.alarmsEnabled,
+            leadMinutes: settings.leadMinutes,
+            holdSeconds: settings.holdSeconds,
+            mathCount: settings.mathCount,
+            maxVolume: settings.maxVolume,
+            vibrate: settings.vibrate
+        },
+        timetable: timetable
+    })
+        .then(result => {
+
+            lastSync = result;
+
+            renderAlarmInfo();
+
+            return result;
+        })
+        .catch(error => {
+
+            console.error("Could not sync with Android:", error);
+
+            return null;
+        });
+}
 
 
 // =====================
@@ -214,12 +292,18 @@ const homePage =
 const timetablePage =
     document.getElementById("timetablePage");
 
+const settingsPage =
+    document.getElementById("settingsPage");
+
 
 const homeButton =
     document.getElementById("homeButton");
 
 const timetableButton =
     document.getElementById("timetableButton");
+
+const settingsButton =
+    document.getElementById("settingsButton");
 
 
 const dateElement =
@@ -298,8 +382,40 @@ const taskEnd =
     document.getElementById("taskEnd");
 
 
+const taskAlarm =
+    document.getElementById("taskAlarm");
+
+
 const cancelButton =
     document.getElementById("cancelButton");
+
+
+const alarmInfo =
+    document.getElementById("alarmInfo");
+
+const setEnabled =
+    document.getElementById("setEnabled");
+
+const setLead =
+    document.getElementById("setLead");
+
+const setHold =
+    document.getElementById("setHold");
+
+const setMath =
+    document.getElementById("setMath");
+
+const setVolume =
+    document.getElementById("setVolume");
+
+const setVibrate =
+    document.getElementById("setVibrate");
+
+const testAlarmButton =
+    document.getElementById("testAlarm");
+
+const permissionList =
+    document.getElementById("permissionList");
 
 
 // --------------------------------------------------
@@ -675,6 +791,11 @@ function renderTimetable() {
         row.className = "task";
 
 
+        // 🔕 marks a task whose alarm is switched off
+        const mute =
+            task.alarm === false ? "🔕 " : "";
+
+
         row.innerHTML = `
             <div></div>
 
@@ -683,7 +804,7 @@ function renderTimetable() {
             </div>
 
             <div class="task-name">
-                ${escapeHTML(task.name)}
+                ${mute}${escapeHTML(task.name)}
             </div>
             <div class="buttons">
                 <button
@@ -743,7 +864,7 @@ function renderTimetable() {
 
             }
         );
-        taskListElement.appendChild(row);    
+        taskListElement.appendChild(row);
     });
 }
 
@@ -771,6 +892,8 @@ function openEditor(index) {
         taskEnd.value =
             "10:00";
 
+        taskAlarm.checked = true;
+
     } else {
 
         const task =
@@ -791,6 +914,10 @@ function openEditor(index) {
 
         taskEnd.value =
             task.end;
+
+
+        taskAlarm.checked =
+            task.alarm !== false;
 
     }
 
@@ -858,7 +985,9 @@ taskForm.addEventListener(
 
             start,
 
-            end
+            end,
+
+            alarm: taskAlarm.checked
 
         };
 
@@ -897,66 +1026,345 @@ taskForm.addEventListener(
 
 
 // --------------------------------------------------
+// SETTINGS PAGE
+// --------------------------------------------------
+
+function renderSettings() {
+
+    setEnabled.checked = settings.alarmsEnabled;
+
+    setLead.value = settings.leadMinutes;
+
+    setHold.value = settings.holdSeconds;
+
+    setMath.value = settings.mathCount;
+
+    setVolume.checked = settings.maxVolume;
+
+    setVibrate.checked = settings.vibrate;
+
+    renderAlarmInfo();
+
+    refreshPermissions();
+}
+
+
+function renderAlarmInfo() {
+
+    if (!alarmInfo) return;
+
+
+    if (!StudyAlarm) {
+
+        alarmInfo.textContent =
+            "Alarms only work in the Android app.";
+
+        return;
+
+    }
+
+
+    if (!settings.alarmsEnabled) {
+
+        alarmInfo.textContent =
+            "Alarms are off.";
+
+        return;
+
+    }
+
+
+    if (lastSync && lastSync.nextAlarmAt > 0) {
+
+        const when =
+            new Date(lastSync.nextAlarmAt).toLocaleString(
+                "en-US",
+                {
+                    weekday: "long",
+                    hour: "numeric",
+                    minute: "2-digit"
+                }
+            );
+
+        alarmInfo.textContent =
+            `Next alarm: ${when}`;
+
+    } else {
+
+        alarmInfo.textContent =
+            "No alarms scheduled.";
+
+    }
+}
+
+
+async function refreshPermissions() {
+
+    if (!StudyAlarm) {
+
+        permissionList.textContent =
+            "Only available in the Android app.";
+
+        return;
+
+    }
+
+
+    try {
+
+        const status =
+            await StudyAlarm.getStatus();
+
+
+        permissionList.innerHTML = "";
+
+
+        addPermissionRow(
+            "Notifications",
+            status.notifications,
+            "notifications"
+        );
+
+        addPermissionRow(
+            "Full-screen alarm over the lock screen",
+            status.fullScreen,
+            "fullScreen"
+        );
+
+        addPermissionRow(
+            "Unrestricted battery use (most reliable)",
+            status.batteryUnrestricted,
+            "battery"
+        );
+
+    } catch (error) {
+
+        console.error("Could not read status:", error);
+
+    }
+}
+
+
+function addPermissionRow(label, ok, type) {
+
+    const row =
+        document.createElement("div");
+
+    row.className = "perm";
+
+
+    const text =
+        document.createElement("span");
+
+    text.textContent =
+        (ok ? "✅ " : "⚠️ ") + label;
+
+    row.appendChild(text);
+
+
+    if (!ok) {
+
+        const button =
+            document.createElement("button");
+
+        button.type = "button";
+
+        button.className = "edit-button";
+
+        button.textContent = "Fix";
+
+        button.addEventListener(
+            "click",
+            () => StudyAlarm.openSettings({ type })
+        );
+
+        row.appendChild(button);
+
+    }
+
+
+    permissionList.appendChild(row);
+}
+
+
+function bindSettings() {
+
+    setEnabled.addEventListener(
+        "change",
+        () => {
+
+            settings.alarmsEnabled = setEnabled.checked;
+
+            saveSettings();
+
+        }
+    );
+
+
+    setLead.addEventListener(
+        "change",
+        () => {
+
+            settings.leadMinutes =
+                clampInt(setLead.value, 0, 240, 10);
+
+            setLead.value = settings.leadMinutes;
+
+            saveSettings();
+
+        }
+    );
+
+
+    setHold.addEventListener(
+        "change",
+        () => {
+
+            settings.holdSeconds =
+                clampInt(setHold.value, 1, 60, 5);
+
+            setHold.value = settings.holdSeconds;
+
+            saveSettings();
+
+        }
+    );
+
+
+    setMath.addEventListener(
+        "change",
+        () => {
+
+            settings.mathCount =
+                clampInt(setMath.value, 0, 10, 0);
+
+            setMath.value = settings.mathCount;
+
+            saveSettings();
+
+        }
+    );
+
+
+    setVolume.addEventListener(
+        "change",
+        () => {
+
+            settings.maxVolume = setVolume.checked;
+
+            saveSettings();
+
+        }
+    );
+
+
+    setVibrate.addEventListener(
+        "change",
+        () => {
+
+            settings.vibrate = setVibrate.checked;
+
+            saveSettings();
+
+        }
+    );
+
+
+    testAlarmButton.addEventListener(
+        "click",
+        async () => {
+
+            if (!StudyAlarm) {
+
+                alert("Alarms only work in the Android app.");
+
+                return;
+
+            }
+
+
+            // make sure the newest settings are on the native side first
+            await syncNative();
+
+            await StudyAlarm.testAlarm({ seconds: 10 });
+
+            alarmInfo.textContent =
+                "Test alarm in 10 seconds. Lock the phone or close the app now.";
+
+        }
+    );
+
+
+    // coming back from Android's settings screens
+    document.addEventListener(
+        "visibilitychange",
+        () => {
+
+            if (
+                document.visibilityState === "visible" &&
+                !settingsPage.classList.contains("hidden")
+            ) {
+
+                refreshPermissions();
+
+            }
+
+        }
+    );
+}
+
+
+// --------------------------------------------------
 // NAVIGATION
 // --------------------------------------------------
 
-homeButton.addEventListener(
-    "click",
-    () => {
+function showPage(name) {
 
-        homePage.classList.remove(
-            "hidden"
-        );
+    const pages = {
+        home: homePage,
+        timetable: timetablePage,
+        settings: settingsPage
+    };
 
-
-        timetablePage.classList.add(
-            "hidden"
-        );
-
-
-        homeButton.classList.add(
-            "active"
-        );
+    const buttons = {
+        home: homeButton,
+        timetable: timetableButton,
+        settings: settingsButton
+    };
 
 
-        timetableButton.classList.remove(
-            "active"
-        );
+    for (const key of Object.keys(pages)) {
 
+        pages[key].classList.toggle("hidden", key !== name);
 
-        updateHome();
+        buttons[key].classList.toggle("active", key === name);
 
     }
+
+
+    if (name === "home") updateHome();
+
+    if (name === "timetable") renderTimetable();
+
+    if (name === "settings") renderSettings();
+}
+
+
+homeButton.addEventListener(
+    "click",
+    () => showPage("home")
 );
 
 
 timetableButton.addEventListener(
     "click",
-    () => {
-
-        homePage.classList.add(
-            "hidden"
-        );
+    () => showPage("timetable")
+);
 
 
-        timetablePage.classList.remove(
-            "hidden"
-        );
-
-
-        homeButton.classList.remove(
-            "active"
-        );
-
-
-        timetableButton.classList.add(
-            "active"
-        );
-
-
-        renderTimetable();
-
-    }
+settingsButton.addEventListener(
+    "click",
+    () => showPage("settings")
 );
 
 
@@ -980,6 +1388,14 @@ function escapeHTML(text) {
 // --------------------------------------------------
 // START
 // --------------------------------------------------
+
+loadTimetable();
+
+loadSettings();
+
+bindSettings();
+
+syncNative();
 
 renderTimetable();
 
